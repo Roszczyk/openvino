@@ -348,7 +348,7 @@ private:
             _prim = PrimType(_pd);
         } else {
             std::vector<uint8_t> key = _pd.get_cache_blob_id();
-            assert(!key.empty());
+            OPENVINO_ASSERT(!key.empty(), "Expected not empty key");
 
             std::vector<uint8_t> cache;
             {
@@ -470,7 +470,9 @@ protected:
 
         if (_scratchpad_md.get_size() != 0) {
             // onednn primitive can have only 1 scratchpad memory.
-            auto scratchpad = instance.get_intermediates_memories()[0];
+            auto scratchpad_memories = instance.get_intermediates_memories();
+            OPENVINO_ASSERT(scratchpad_memories.size() > 0, "Expected at least one scratchpad buffer (non empty scrathpad_memories)");
+            auto scratchpad = scratchpad_memories[0];
             args.insert({DNNL_ARG_SCRATCHPAD, scratchpad->get_onednn_memory(_scratchpad_md, 0)});
         }
 
