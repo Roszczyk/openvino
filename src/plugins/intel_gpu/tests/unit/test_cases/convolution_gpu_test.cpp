@@ -11878,7 +11878,7 @@ TEST_P(conv_dyn_test, convolution_gpu_bfyx_os_iyx_osv32_no_bias) {
 
         auto input = engine.allocate_memory({ new_shape, data_types::f16, format::bfyx });
 
-        VF<ov::float16> input_rnd = rg.generate_random_1d<ov::float16>(ov::shape_size(p.in_shape), -10, 10);
+        VF<ov::float16> input_rnd = rg.generate_random_1d<ov::float16>(ov::shape_size(new_shape), -10, 10);
         set_values(input, input_rnd);
 
         network.set_input_data("input", input);
