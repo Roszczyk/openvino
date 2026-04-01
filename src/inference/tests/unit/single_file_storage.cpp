@@ -6,16 +6,11 @@
 
 #include <gtest/gtest.h>
 
-#ifdef _WIN32
-#    include <windows.h>
-#else
-#    include <unistd.h>
-#endif
-
 #include "common_test_utils/common_utils.hpp"
 #include "common_test_utils/file_utils.hpp"
 #include "common_test_utils/test_assertions.hpp"
 #include "openvino/runtime/aligned_buffer.hpp"
+#include "openvino/util/mmap_object.hpp"
 
 namespace ov::test {
 
@@ -24,16 +19,6 @@ using runtime::SingleFileStorage;
 namespace {
 constexpr uint64_t version_size() {
     return 3 * sizeof(uint16_t);  // major, minor, patch
-}
-
-std::streamoff get_system_page_size() {
-#ifdef _WIN32
-    SYSTEM_INFO sysInfo;
-    GetSystemInfo(&sysInfo);
-    return static_cast<std::streamoff>(sysInfo.dwPageSize);
-#else
-    return static_cast<std::streamoff>(sysconf(_SC_PAGE_SIZE));
-#endif
 }
 }  // namespace
 
@@ -135,8 +120,6 @@ TEST_F(SingleFileStorageTest, BlobAlignment) {
     const auto stream_end = stream.tellg();
     stream.seekg(version_size(), std::ios::beg);
 
-    const auto alignment = get_system_page_size();
-
     while (stream.good() && stream.tellg() < stream_end) {
         SingleFileStorage::Tag tag;
         runtime::TLVTraits::LengthType length;
@@ -155,7 +138,8 @@ TEST_F(SingleFileStorageTest, BlobAlignment) {
 
             stream.seekg(padding_size, std::ios::cur);
             const auto blob_data_pos = stream.tellg();
-            EXPECT_EQ(blob_data_pos % alignment, 0) << "Blob with id " << id << " is not properly aligned";
+            EXPECT_EQ(blob_data_pos % SingleFileStorage::blob_alignment, 0)
+                << "Blob with id " << id << " is not properly aligned";
 
             const auto expected_pos = blob_id_pos + static_cast<std::streamoff>(length);
             stream.seekg(test_blobs.at(id).size(), std::ios::cur);
@@ -209,12 +193,12 @@ TEST_F(SingleFileStorageTest, ContextMetaWriteRead) {
 
     const auto meta_read_test = [&](SingleFileStorage& storage) {
         auto got_context = storage.get_context();
-        EXPECT_EQ(got_context.m_weight_registry.size(), 2);
+        EXPECT_EQ(got_context->m_weight_registry.size(), 2);
 
         for (const auto& [source_id, const_meta] : test_context.m_weight_registry) {
-            auto& got_meta_data = got_context.m_weight_registry;
+            auto& got_meta_data = got_context->m_weight_registry;
             ASSERT_EQ(got_meta_data.count(source_id), 1);
-            EXPECT_EQ(got_context.m_weight_registry[source_id].size(),
+            EXPECT_EQ(got_context->m_weight_registry[source_id].size(),
                       test_context.m_weight_registry[source_id].size());
             for (const auto& [const_id, expected_props] : const_meta) {
                 ASSERT_EQ(got_meta_data[source_id].count(const_id), 1);
@@ -244,9 +228,9 @@ TEST_F(SingleFileStorageTest, ContextMetaAppendDelta) {
     m_storage->write_context(test_context);
 
     auto got_context = m_storage->get_context();
-    EXPECT_EQ(got_context.m_weight_registry.size(), 2);
-    EXPECT_EQ(got_context.m_weight_registry[1].size(), 2);
-    EXPECT_EQ(got_context.m_weight_registry[2].size(), 1);
+    EXPECT_EQ(got_context->m_weight_registry.size(), 2);
+    EXPECT_EQ(got_context->m_weight_registry[1].size(), 2);
+    EXPECT_EQ(got_context->m_weight_registry[2].size(), 1);
     m_storage.reset();
     const auto file_size_after_first_write = test::utils::fileSize(m_file_path.string());
 
@@ -270,8 +254,6 @@ TEST_F(SingleFileStorageTest, ContextWeightSourceWrite) {
     const auto stream_end = stream.tellg();
     stream.seekg(version_size(), std::ios::beg);
 
-    const auto alignment = get_system_page_size();
-
     while (stream.good() && stream.tellg() < stream_end) {
         SingleFileStorage::Tag tag;
         runtime::TLVTraits::LengthType length;
@@ -289,7 +271,7 @@ TEST_F(SingleFileStorageTest, ContextWeightSourceWrite) {
 
             stream.seekg(padding_size, std::ios::cur);
             const auto weight_pos = stream.tellg();
-            ASSERT_EQ(weight_pos % alignment, 0);
+            ASSERT_EQ(weight_pos % SingleFileStorage::blob_alignment, 0);
             const auto weight_size =
                 length - sizeof(device_id) - sizeof(source_id) - sizeof(padding_size) - padding_size;
             ASSERT_EQ(weight_size, buffer->size());
@@ -312,7 +294,7 @@ TEST_F(SingleFileStorageTest, ContextWeightSourceAppendDelta) {
     test_context.m_cache_sources[11].m_weights = buffer_2;
     m_storage->write_context(test_context);
 
-    EXPECT_EQ(m_storage->get_context().m_cache_sources.size(), 2);
+    EXPECT_EQ(m_storage->get_context()->m_cache_sources.size(), 2);
     m_storage.reset();
     const auto file_size_after_first_write = test::utils::fileSize(m_file_path.string());
 
