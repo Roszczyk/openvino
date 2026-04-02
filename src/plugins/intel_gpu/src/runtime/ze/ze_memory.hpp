@@ -11,6 +11,7 @@
 #include <cassert>
 #include <mutex>
 #include <memory>
+#include <set>
 
 namespace cldnn {
 namespace ze {
@@ -22,6 +23,33 @@ struct lockable_gpu_mem {
     std::mutex _mutex;
     unsigned _lock_count;
     void* _mapped_ptr;
+};
+
+class LeakDetector {
+    public:
+        static LeakDetector& get_instance() {
+            static LeakDetector detector;
+            return detector;
+        }
+
+        std::set<void*> pool;
+
+        void alloc(void* ptr) {
+            std::cout << "Allocate " << ptr << std::endl;
+            pool.insert(ptr);
+        }
+
+        void free(void* ptr){
+            std::cout << "Free " << ptr << std::endl;
+            pool.erase(ptr);
+        }
+
+        ~LeakDetector() {
+            std::cout << "Leak detector restarted" << std::endl;
+            for (auto ptr : pool) {
+                std::cout << "Not freed address: " << ptr << std::endl;
+            }
+        }
 };
 
 class UsmHolder {
@@ -36,6 +64,7 @@ public:
     void* ptr() { return _ptr; }
     void memFree() {
         if (!_shared_memory && _ptr != nullptr) {
+            LeakDetector::get_instance().free(_ptr);
             OV_ZE_WARN(zeMemFree(_context, _ptr));
             _ptr = nullptr;
         }
@@ -71,6 +100,7 @@ public:
 
         void* memory = nullptr;
         OV_ZE_EXPECT(zeMemAllocHost(_context, &host_desc, size, 1, &memory));
+        LeakDetector::get_instance().alloc(memory);
         _usm_pointer = std::make_shared<UsmHolder>(_context, memory);
     }
 
@@ -88,6 +118,7 @@ public:
 
         void* memory = nullptr;
         OV_ZE_EXPECT(zeMemAllocShared(_context, &device_desc, &host_desc, size, 1, _device, &memory));
+        LeakDetector::get_instance().alloc(memory);
         _usm_pointer = std::make_shared<UsmHolder>(_context, memory);
     }
 
@@ -100,6 +131,7 @@ public:
 
         void* memory = nullptr;
         OV_ZE_EXPECT(zeMemAllocDevice(_context, &device_desc, size, 4096, _device, &memory));
+        LeakDetector::get_instance().alloc(memory);
         _usm_pointer = std::make_shared<UsmHolder>(_context, memory);
     }
 
