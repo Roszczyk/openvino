@@ -35,12 +35,10 @@ class LeakDetector {
         std::set<void*> pool;
 
         void alloc(void* ptr) {
-            std::cout << "Allocate " << ptr << std::endl;
             pool.insert(ptr);
         }
 
         void free(void* ptr){
-            std::cout << "Free " << ptr << std::endl;
             pool.erase(ptr);
         }
 
