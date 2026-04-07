@@ -150,6 +150,7 @@ event::ptr gpu_usm::fill(stream& stream, unsigned char pattern, const std::vecto
     auto ev = _ze_stream.create_base_event();
     auto ev_ze = downcast<ze::ze_base_event>(ev.get())->get_handle();
     auto ze_dep_events = get_ze_events(dep_events);
+    std::cout << "Bytes count: " << _bytes_count << std::endl;
     OV_ZE_EXPECT(zeCommandListAppendMemoryFill(_ze_stream.get_queue(),
         _buffer.get(),
         &pattern,

@@ -33,6 +33,7 @@ void ze_kernel_builder::init_ocl_builder() const {
 }
 
 bool ze_kernel_builder::check_l0_build_support() const {
+    return false;
     static std::unordered_map<ze_device_handle_t, bool> cache;
     static std::mutex m;
     // Prevent multiple threads from checking support at the same time

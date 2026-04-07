@@ -44,13 +44,16 @@ public:
 
     ze_kernel(std::shared_ptr<ze_kernel_holder> kernel, const std::string& kernel_id)
         : m_kernel(kernel)
-        , m_kernel_id(kernel_id) { }
+        , m_kernel_id(kernel_id) {
+            std::cout << "Kernel created: " << kernel_id << std::endl;
+         }
 
     ze_kernel_handle_t get_kernel_handle() const { return m_kernel->get_kernel_handle(); }
     ze_module_handle_t get_module_handle() const { return m_kernel->get_module()->get_module_handle(); }
     std::string get_id() const override { return m_kernel_id; }
 
     std::shared_ptr<kernel> clone(bool reuse_kernel_handle = false) const override {
+        std::cout << "Cloning..." << std::endl;
         if (reuse_kernel_handle) {
             return std::make_shared<ze_kernel>(m_kernel, m_kernel_id);
         } else {
