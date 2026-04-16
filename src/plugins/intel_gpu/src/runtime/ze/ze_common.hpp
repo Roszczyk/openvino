@@ -13,6 +13,9 @@
 #include <sstream>
 #include <iomanip>
 
+#include <thread>
+#include <mutex>
+
 // Expect success of level zero command, throw runtime error otherwise
 #define OV_ZE_EXPECT(f) \
     do { \
@@ -45,15 +48,22 @@ inline const ::ov::ZeroApi& get_ze_api_instance() {
     return *ze_api;
 }
 
+std::mutex& get_ze_mutex();
+
 // All Level Zero calls should go through this wrapper
 #define symbol_statement(symbol)                                                                            \
     template <typename... Args>                                                                             \
     inline typename std::invoke_result<decltype(&::symbol), Args...>::type wrapped_##symbol(Args... args) { \
+        std::lock_guard<std::mutex> lock(get_ze_mutex());                                                   \
+        std::thread::id this_id = std::this_thread::get_id();                                               \
         const auto& ze_api = get_ze_api_instance();                                                         \
         if (ze_api.symbol == nullptr) {                                                                     \
             OPENVINO_THROW("Unsupported symbol " #symbol);                                                  \
         }                                                                                                   \
-        return ze_api.symbol(std::forward<Args>(args)...);                                                  \
+        auto result = ze_api.symbol(std::forward<Args>(args)...);                                           \
+        std::cout << "thread " << this_id << " symbol: " << #symbol << " result: "                          \
+        << result << std::endl;                                                                             \
+        return result;                                                                                      \
     }
 symbols_list();
 weak_symbols_list();

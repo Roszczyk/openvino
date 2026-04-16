@@ -281,6 +281,8 @@ event::ptr ze_stream::enqueue_kernel(kernel& kernel,
                                              set_output_event ? std::dynamic_pointer_cast<ze_base_event>(ev)->get_handle() : nullptr,
                                              dep_events_ptr == nullptr ? 0 : static_cast<uint32_t>(dep_events_ptr->size()),
                                              dep_events_ptr == nullptr ? 0 : &dep_events_ptr->front()));
+    std::cout << "Kernel id: " << ze_kernel.get_id() << std::endl;
+    OV_ZE_EXPECT(ze::zeCommandListHostSynchronize(m_command_list, endless_wait));
 
     return ev;
 }

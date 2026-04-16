@@ -22,6 +22,11 @@ namespace {
     }
 }
 
+std::mutex& cldnn::ze::get_ze_mutex() {
+    static std::mutex m;
+    return m;
+}
+
 ze_counter_based_event_factory::ze_counter_based_event_factory(const ze_engine &engine, bool enable_profiling)
     : ze_base_event_factory(engine, enable_profiling) {
     std::call_once(counter_based_ev_init_flag, find_function_address, engine.get_driver());
