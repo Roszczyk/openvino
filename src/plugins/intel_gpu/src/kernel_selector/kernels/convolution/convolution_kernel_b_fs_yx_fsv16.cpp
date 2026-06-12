@@ -23,7 +23,7 @@ bool post_reorder_fused(const convolution_params& params) {
 }  // namespace
 
 ConvolutionKernel_b_fs_yx_fsv16::ConvolutionKernel_b_fs_yx_fsv16()
-#ifdef OV_GPU_WITH_ZE_RT
+#if defined(OV_GPU_WITH_ZE_RT) 
     : ConvolutionKernelBase("convolution_gpu_bfyx_f16_ze") {
 #else
     : ConvolutionKernelBase("convolution_gpu_bfyx_f16") {
