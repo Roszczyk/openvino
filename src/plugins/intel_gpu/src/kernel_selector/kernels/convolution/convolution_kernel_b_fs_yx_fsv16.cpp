@@ -169,20 +169,31 @@ bool ConvolutionKernel_b_fs_yx_fsv16::Validate(const Params& p) const {
     if (!ConvolutionKernelBase::Validate(p) || !ConvolutionCheckInput(p)) {
         DO_NOT_USE_THIS_KERNEL(p.layerID);
     }
-
-    const auto dispatchData = SetDefault(params);
-    if (params.engineInfo.arch >= gpu_arch::xe2 && params.inputs[0].X().v % 8 != 0){
-        DO_NOT_USE_THIS_KERNEL(p.layerID);
-        std::cout << "Not using this kernel" << std::endl;
-    } else std::cout << "Using this kernel" << std::endl;
-
-
+    
     const auto& params = static_cast<const convolution_params&>(p);
-
-    ConvolutionTuningData tuning_data = GetTuningParams(params);
 
     const auto& input = params.inputs[0];
     const auto& output = params.outputs[0];
+
+    if (params.engineInfo.arch >= gpu_arch::xe2) {
+        const auto blockWidth = GetAutoTuneOptions(params, 0).blockWidth;
+        const auto outputXBlocks = CeilDiv(output.X().v, blockWidth);
+        const auto lastInputX = static_cast<int64_t>(outputXBlocks - 1) * static_cast<int64_t>(blockWidth) *
+                                    static_cast<int64_t>(params.stride.x) -
+                                static_cast<int64_t>(params.padding_begin.x);
+        const auto inputLineSize = std::min(params.stride.x * (blockWidth - 1) +
+                                                (params.weights.X().v - 1) * params.dilation.x + 1,
+                                            input.X().v + input.X().pad.Total());
+        const auto inputReadEnd = lastInputX + static_cast<int64_t>(inputLineSize);
+        const auto inputPhysicalEnd = static_cast<int64_t>(input.X().v + input.X().pad.after);
+
+        if (lastInputX < -static_cast<int64_t>(input.X().pad.before) || inputReadEnd > inputPhysicalEnd) {
+            std::cout << "Not using this kernel" << std::endl;
+            DO_NOT_USE_THIS_KERNEL(p.layerID);
+        } else std::cout << "Using this kernel" << std::endl;
+    }
+
+    ConvolutionTuningData tuning_data = GetTuningParams(params);
 
     if (params.groups > 1) {
         auto outFeaturesPerGroup = output.Feature().v / params.groups;
