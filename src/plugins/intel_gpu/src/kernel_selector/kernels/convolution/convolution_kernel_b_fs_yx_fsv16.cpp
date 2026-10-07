@@ -170,6 +170,13 @@ bool ConvolutionKernel_b_fs_yx_fsv16::Validate(const Params& p) const {
         DO_NOT_USE_THIS_KERNEL(p.layerID);
     }
 
+    const auto dispatchData = SetDefault(params);
+    if (params.engineInfo.arch >= gpu_arch::xe2 && params.inputs[0].X().v % 8 != 0){
+        DO_NOT_USE_THIS_KERNEL(p.layerID);
+        std::cout << "Not using this kernel" << std::endl;
+    } else std::cout << "Using this kernel" << std::endl;
+
+
     const auto& params = static_cast<const convolution_params&>(p);
 
     ConvolutionTuningData tuning_data = GetTuningParams(params);
